@@ -65,7 +65,6 @@ function Tracker( flowTracker ){
     for( var i=0; i<faces.length; i++){
       if( faces[i].isInside(obj) ) return faces[i]
       if( faces[i].flowPoint && faces[i].flowPoint.isInside(obj) ){
-        console.log( "Found via flowpoint")
         return faces[i]
       }
     }
@@ -148,7 +147,7 @@ function FlowTracker(width, height, ctx){
 
   var opt = {
     win_size: 30,
-    max_iters: 10,
+    max_iters: 5,
     epsilon: .01,
     min_eigen: .001
   }
@@ -242,8 +241,8 @@ function FlowTracker(width, height, ctx){
 
 }
 
-function FaceFinder(){
-  var video = document.getElementById('webcam'),
+function FaceFinder( videoId ){
+  var video = document.getElementById(videoId),
       tracker = null,
       flow = null,
       self = this
@@ -321,15 +320,7 @@ function FaceFinder(){
 
     stat.stop("bbf detector");
 
-    $('#log').html(stat.log());
+    document.getElementById('log').innerHTML = stat.log();
   }
 
 }
-
-
-$(window).load(function() {
-  var finder = new FaceFinder()
-  $(finder).bind('detected', function(e, data){
-    console.log( data )
-  })
-});
