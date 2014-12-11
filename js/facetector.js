@@ -25,7 +25,7 @@ function TrackedObject(rect, flowTracker){
   this.update = function( newRect ){
     rect = _(newRect).clone()
 
-    if( newRect.confidence > 0){
+    if( newRect.confidence > 1){
       confidences.push(newRect.confidence)
       if( confidences.length > 5 ) confidences.shift()
     
@@ -83,7 +83,7 @@ function Tracker( flowTracker ){
     var matchedFace = getContainedFace(obj)
 
     if( matchedFace == null ){
-      if( rect.confidence > 0 ){
+      if( rect.confidence > 1 ){
         faces.push( obj )
         obj.update( rect )
       } 
@@ -91,7 +91,6 @@ function Tracker( flowTracker ){
     else {
       matchedFace.update( rect )
     }
-
   }
 
 
@@ -148,7 +147,7 @@ function FlowTracker(width, height, ctx){
   var opt = {
     win_size: 30,
     max_iters: 5,
-    epsilon: .01,
+    epsilon: .005,
     min_eigen: .001
   }
 
@@ -223,25 +222,16 @@ function FlowTracker(width, height, ctx){
     prev_img_pyr = curr_img_pyr;
     curr_img_pyr = _pyr;
 
-    //stat.start("grayscale");
     jsfeat.imgproc.grayscale(imageData.data, width, height, curr_img_pyr.data[0]);
-    //stat.stop("grayscale");
-
-    //stat.start("build image pyramid");
     curr_img_pyr.build(curr_img_pyr.data[0], true);
-    //stat.stop("build image pyramid");
-
-    //stat.start("optical flow lk");
     jsfeat.optical_flow_lk.track(prev_img_pyr, curr_img_pyr, prev_xy, curr_xy, point_count, opt.win_size, opt.max_iters, point_status, opt.epsilon, opt.min_eigen);
-    //stat.stop("optical flow lk");
 
     pruneNonActivePoints()
-    //console.log( curr_xy, point_status)
   }
 
 }
 
-function FaceFinder( videoId ){
+function Facetector( videoId ){
   var video = document.getElementById(videoId),
       tracker = null,
       flow = null,
@@ -249,7 +239,7 @@ function FaceFinder( videoId ){
   
   var findVideoSize = function() {
     video.removeEventListener('loadeddata', findVideoSize);
-    demo_app(video.videoWidth, video.videoHeight);
+    init(video.videoWidth, video.videoHeight);
     compatibility.requestAnimationFrame(tick);
   }
 
@@ -264,9 +254,9 @@ function FaceFinder( videoId ){
 
   var img_u8,work_canvas,work_ctx,previousPyr;
 
-  var max_work_size = 320;
+  var max_work_size = 300;
 
-  function demo_app(videoWidth, videoHeight) {
+  function init(videoWidth, videoHeight) {
     
     var scale = Math.min(max_work_size/videoWidth, max_work_size/videoHeight);
     var w = videoWidth*scale;
@@ -286,16 +276,17 @@ function FaceFinder( videoId ){
 
     jsfeat.bbf.prepare_cascade(jsfeat.bbf.face_cascade);
 
-    stat.add("bbf detector");
+    stat.add("bbf detector")
+    stat.add("flow")
+    stat.add("detect")
   }
 
   function tick() {
 
-    //setTimeout(function(){
-      compatibility.requestAnimationFrame(tick);  
-    //}, 10)
+    compatibility.requestAnimationFrame(tick);
     
     stat.new_frame();
+
     if (video.readyState !== video.HAVE_ENOUGH_DATA) return
 
     work_ctx.drawImage(video, 0, 0, work_canvas.width, work_canvas.height);
@@ -305,8 +296,11 @@ function FaceFinder( videoId ){
 
     jsfeat.imgproc.grayscale(imageData.data, work_canvas.width, work_canvas.height, img_u8);
     var pyr = jsfeat.bbf.build_pyramid(img_u8, 24*1, 24*1, 1);
+    stat.start("detect");
     var faceRects = jsfeat.bbf.detect(pyr, jsfeat.bbf.face_cascade);
+    stat.stop("detect");
     faceRects = jsfeat.bbf.group_rectangles(faceRects, 1);
+    stat.stop("bbf detector");
 
     // Sort the faces on confidence
     jsfeat.math.qsort(faceRects, 0, faceRects.length-1, function(a,b){return (b.confidence<a.confidence)})
@@ -316,9 +310,11 @@ function FaceFinder( videoId ){
     })
 
     tracker.draw(work_ctx, work_canvas.width/img_u8.cols)
+    stat.start("flow");
     flow.update()
+    stat.stop("flow");
 
-    stat.stop("bbf detector");
+    
 
     document.getElementById('log').innerHTML = stat.log();
   }
