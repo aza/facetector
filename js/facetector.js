@@ -132,7 +132,7 @@ function Tracker( flowTracker ){
 function FlowTracker(width, height, ctx){
   var curr_img_pyr = new jsfeat.pyramid_t(3),
       prev_img_pyr = new jsfeat.pyramid_t(3),
-      maxPointsToTrack = 5,
+      maxPointsToTrack = 100,
       flow = this
   
   curr_img_pyr.allocate(width, height, jsfeat.U8_t|jsfeat.C1_t)
@@ -145,9 +145,9 @@ function FlowTracker(width, height, ctx){
       curr_xy = new Float32Array(maxPointsToTrack*2)
 
   var opt = {
-    win_size: 30,
-    max_iters: 5,
-    epsilon: .005,
+    win_size: 100,
+    max_iters: 100,
+    epsilon: .01,
     min_eigen: .001
   }
 
@@ -177,9 +177,6 @@ function FlowTracker(width, height, ctx){
     this.setPoint = function(point){
       curr_xy[index<<1] = point.x
       curr_xy[(index<<1)+1] = point.y
-
-      prev_xy[index<<1] = point.x
-      prev_xy[(index<<1)+1] = point.y
     }
 
   }
@@ -190,15 +187,12 @@ function FlowTracker(width, height, ctx){
 
   this.addPointToTrack = function( point ){
 
-    for(var i=0; point_status[point_count] == 1 && i<=maxPointsToTrack; i++){
-      incrementPointCount()
-    }
-
     curr_xy[point_count<<1] = point.x;
     curr_xy[(point_count<<1)+1] = point.y;
     var flowPoint = new FlowPoint( point_count )
-    // This will break if we wrap all the way around
-    incrementPointCount()
+    
+    point_count++
+    console.log( "PC", point_count )
     return flowPoint
   }
 
@@ -295,7 +289,7 @@ function Facetector( videoId ){
     stat.start("bbf detector");
 
     jsfeat.imgproc.grayscale(imageData.data, work_canvas.width, work_canvas.height, img_u8);
-    var pyr = jsfeat.bbf.build_pyramid(img_u8, 24*1, 24*1, 1);
+    var pyr = jsfeat.bbf.build_pyramid(img_u8, 24*1, 24*1, 3);
     stat.start("detect");
     var faceRects = jsfeat.bbf.detect(pyr, jsfeat.bbf.face_cascade);
     stat.stop("detect");
