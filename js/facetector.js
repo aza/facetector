@@ -15,8 +15,8 @@ function TrackedObject(rect, flowTracker){
   
   this.isInside = function(obj){
     var center = self.center(),
-        isContainedX = center.x >= obj.rect.x && center.x <= obj.rect.x+obj.rect.width,
-        isContainedY = center.y >= obj.rect.y && center.y <= obj.rect.y+obj.rect.height
+        isContainedX = center.x >= obj.rect.x*.9 && center.x <= (obj.rect.x+obj.rect.width)*1.1,
+        isContainedY = center.y >= obj.rect.y*.9 && center.y <= (obj.rect.y+obj.rect.height)*1.1
 
     if( isContainedX && isContainedY ) return true
     return false
@@ -51,6 +51,10 @@ function TrackedObject(rect, flowTracker){
     return (new Date()-lastUpdate) <= 500 ? true : false
   }
 
+  this.isOld = function(){
+    return (new Date()-lastUpdate) >= 3000 ? true : false
+  }
+
   this.confidence = function(){
     return _(confidences).reduce(function(num,memo){return num+memo},0)/confidences.length
   }
@@ -74,6 +78,7 @@ function Tracker( flowTracker ){
 
   function removeInactiveFaces(){
     faces = _(faces).filter(function(face){ return face.isActive() || (face.flowPoint && face.flowPoint.isActive()) })
+    faces = _(faces).filter(function(face){ return !face.isOld() })
   }
 
   this.update = function( rect ){
@@ -105,12 +110,12 @@ function Tracker( flowTracker ){
         ctx.fillStyle = "#fff"
         ctx.fillText(parseInt(face.confidence()), face.rect.x*scale, face.rect.y*scale)  
       }
-      else if( face.flowPoint && face.flowPoint.isActive() ){
+      else if( face.flowPoint && face.flowPoint.isActive() && !face.isOld() ){
         var point = face.flowPoint.point()
         ctx.fillRect(point.x*scale-20, point.y*scale-20, 40, 40)
       }
 
-      if( face.flowPoint && face.flowPoint.isActive() ){
+      if( face.flowPoint && face.flowPoint.isActive() && !face.isOld() ){
         ctx.globalAlpha = 1
         ctx.fillStyle = "#fff"
         var point = face.flowPoint.point()
@@ -125,6 +130,10 @@ function Tracker( flowTracker ){
     ctx.globalAlpha = 1
   }
 
+  this.getFaces = function(){
+    return faces
+  }
+
 }
 
 
@@ -132,7 +141,7 @@ function Tracker( flowTracker ){
 function FlowTracker(width, height, ctx){
   var curr_img_pyr = new jsfeat.pyramid_t(3),
       prev_img_pyr = new jsfeat.pyramid_t(3),
-      maxPointsToTrack = 100,
+      maxPointsToTrack = 50,
       flow = this
   
   curr_img_pyr.allocate(width, height, jsfeat.U8_t|jsfeat.C1_t)
@@ -167,8 +176,8 @@ function FlowTracker(width, height, ctx){
 
     this.isInside = function(obj){
       var point = self.point(),
-      isContainedX = point.x >= obj.rect.x && point.x <= obj.rect.x+obj.rect.width,
-      isContainedY = point.y >= obj.rect.y && point.y <= obj.rect.y+obj.rect.height
+      isContainedX = point.x >= obj.rect.x*.9 && point.x <= (obj.rect.x+obj.rect.width)*1.1,
+      isContainedY = point.y >= obj.rect.y*.9 && point.y <= (obj.rect.y+obj.rect.height)*1.1
 
       if( isContainedX && isContainedY ) return true
       return false
@@ -191,36 +200,25 @@ function FlowTracker(width, height, ctx){
     curr_xy[(point_count<<1)+1] = point.y;
     var flowPoint = new FlowPoint( point_count )
     
-    point_count++
-    console.log( "PC", point_count )
+    incrementPointCount()
     return flowPoint
-  }
-
-  function pruneNonActivePoints(){
-    for( var i=0; i<point_status.length; i++){
-      if( point_status[i] == 0 ){
-        curr_xy[i<<1] = 0
-        curr_xy[(i<<1)+1] = 0
-      }
-    }
   }
 
   this.update = function(){
     var imageData = ctx.getImageData(0, 0, width, height);
 
-    // swap flow data
-    var _pt_xy = prev_xy;
     prev_xy = curr_xy;
-    curr_xy = _pt_xy;
-    var _pyr = prev_img_pyr;
-    prev_img_pyr = curr_img_pyr;
-    curr_img_pyr = _pyr;
+    curr_xy = new Float32Array(maxPointsToTrack*2);
+
+    prev_img_pyr = curr_img_pyr
+    curr_img_pyr = new jsfeat.pyramid_t(3)
+    curr_img_pyr.allocate(width, height, jsfeat.U8_t|jsfeat.C1_t)
 
     jsfeat.imgproc.grayscale(imageData.data, width, height, curr_img_pyr.data[0]);
     curr_img_pyr.build(curr_img_pyr.data[0], true);
     jsfeat.optical_flow_lk.track(prev_img_pyr, curr_img_pyr, prev_xy, curr_xy, point_count, opt.win_size, opt.max_iters, point_status, opt.epsilon, opt.min_eigen);
 
-    pruneNonActivePoints()
+    //pruneNonActivePoints()
   }
 
 }
@@ -277,7 +275,10 @@ function Facetector( videoId ){
 
   function tick() {
 
-    compatibility.requestAnimationFrame(tick);
+    setTimeout(function(){
+      compatibility.requestAnimationFrame(tick);  
+    }, 100)
+    
     
     stat.new_frame();
 
@@ -308,9 +309,11 @@ function Facetector( videoId ){
     flow.update()
     stat.stop("flow");
 
-    
-
     document.getElementById('log').innerHTML = stat.log();
   }
 
+  this.getFaces = function(){
+    if( !tracker || !tracker.getFaces ) return []
+    return tracker.getFaces()
+  }
 }
