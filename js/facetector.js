@@ -256,7 +256,7 @@ function Facetector( videoId ){
 
     img_u8 = new jsfeat.matrix_t(w, h, jsfeat.U8_t | jsfeat.C1_t);
     work_canvas = document.createElement('canvas');
-    document.body.appendChild(work_canvas)
+    //document.body.appendChild(work_canvas)
     work_canvas.width = w;
     work_canvas.height = h;
 
@@ -309,7 +309,7 @@ function Facetector( videoId ){
     flow.update()
     stat.stop("flow");
 
-    document.getElementById('log').innerHTML = stat.log();
+    //document.getElementById('log').innerHTML = stat.log();
   }
 
   this.getFaces = function(){
