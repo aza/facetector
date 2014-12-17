@@ -290,7 +290,7 @@ function Facetector( videoId ){
     stat.start("bbf detector");
 
     jsfeat.imgproc.grayscale(imageData.data, work_canvas.width, work_canvas.height, img_u8);
-    var pyr = jsfeat.bbf.build_pyramid(img_u8, 24*1, 24*1, 3);
+    var pyr = jsfeat.bbf.build_pyramid(img_u8, 24*2, 24*2, 3);
     stat.start("detect");
     var faceRects = jsfeat.bbf.detect(pyr, jsfeat.bbf.face_cascade);
     stat.stop("detect");
